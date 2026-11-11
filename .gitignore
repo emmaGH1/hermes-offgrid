@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+
+NOTES.md
+REVIEW.md
+REVIEW-SMS.md
+*.sqlite
+*.sqlite3

@@ -1,0 +1,34 @@
+name: hermes-ussd
+label: Off-Grid
+kind: platform
+version: 1.0.0
+requires_hermes: ">=0.23.1"
+description: Chat with Hermes by SMS, with USSD as a fallback.
+author: emmaGH1
+python_dependencies:
+  - aiohttp>=3.9,<4
+requires_env:
+  - name: AT_API_KEY
+    description: Africa's Talking API key
+    password: true
+  - name: AT_USERNAME
+    description: Africa's Talking username (sandbox for sandbox)
+  - name: USSD_CALLBACK_SECRET
+    description: Secret query token for the callback URL
+    password: true
+  - name: USSD_ALLOWED_USERS
+    description: Comma-separated E.164 phone numbers allowed to use USSD and receive SMS
+    password: false
+optional_env:
+  - name: OFFGRID_RATE_LIMIT
+    description: Accepted questions per phone per minute across SMS and USSD (default 3, clamped 1–30)
+  - name: AT_SENDER_ID
+    description: Approved Africa's Talking sender ID or shortcode for SMS replies
+  - name: AT_SANDBOX
+    description: Use sandbox endpoints (default true)
+  - name: USSD_HOME_PHONE
+    description: Allowlisted E.164 number for scheduled delivery
+  - name: USSD_HOST
+    description: Listener address (default 127.0.0.1)
+  - name: USSD_PORT
+    description: Listener port (default 8080)
