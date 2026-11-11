@@ -16,6 +16,7 @@ GSM_CONCAT_SEPTETS = 153  # per segment once a message is concatenated
 UNICODE_CONCAT_UNITS = 67
 MAX_SEGMENTS = 5
 TRUNCATED = " [truncated]"
+MAX_CLEAN_CHARS = 4000
 _MAX_RESPONSE_BYTES = 64 * 1024
 _PHONE_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
 _OK_STATUS_CODES = {100, 101, 102}  # Processed, Sent, Queued
@@ -39,26 +40,35 @@ def _utf16_cost(ch: str) -> int:
     return 2 if ord(ch) > 0xFFFF else 1
 
 
+def _pack(costs, single: int, per_segment: int) -> int:
+    """Segments needed when no character (escape pair, surrogate pair) may straddle two."""
+    if sum(costs) <= single:
+        return 1
+    segments, used = 1, 0
+    for c in costs:
+        if used + c > per_segment:
+            segments, used = segments + 1, 0
+        used += c
+    return segments
+
+
 def sms_segments(text: str) -> int:
     """Number of billed SMS segments for ``text`` in its cheapest encoding."""
-    septets: int | None = 0
-    units = 0
-    for ch in text:
-        units += _utf16_cost(ch)
-        if septets is not None:
-            c = _gsm_cost(ch)
-            septets = None if c is None else septets + c
-    if septets is not None:
-        return 1 if septets <= GSM_SEGMENT_SEPTETS else -(-septets // GSM_CONCAT_SEPTETS)
-    return 1 if units <= UNICODE_SEGMENT_UNITS else -(-units // UNICODE_CONCAT_UNITS)
+    gsm = [_gsm_cost(ch) for ch in text]
+    if None not in gsm:
+        return _pack(gsm, GSM_SEGMENT_SEPTETS, GSM_CONCAT_SEPTETS)
+    return _pack([_utf16_cost(ch) for ch in text], UNICODE_SEGMENT_UNITS, UNICODE_CONCAT_UNITS)
 
 
 _MARKDOWN = (
     (re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)"), r"\1 (\2)"),  # [text](url)
     (re.compile(r"^[ \t]*#{1,6}[ \t]+", re.M), ""),                     # headings
     (re.compile(r"^([ \t]*)[*\u2022][ \t]+", re.M), r"\1- "),            # bullets
-    (re.compile(r"\*\*|__|`+"), ""),                                    # bold, code
-    (re.compile(r"(?<![A-Za-z0-9_])_([^_\n]+)_(?![A-Za-z0-9_])"), r"\1"),  # _italic_
+    # Bold only as a matched pair around text, so 2**10 and __init__ survive.
+    (re.compile(r"(?<![\w*])\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*(?![\w*.])"), r"\1"),
+    (re.compile(r"(?<![\w/.])__(?=\S)([^_\n]+?)(?<=\S)__(?![\w.])"), r"\1"),
+    (re.compile(r"`+"), ""),                                            # code
+    (re.compile(r"(?<![\w/.])_(?=\S)([^_\n]+?)(?<=\S)_(?![\w/])"), r"\1"),  # _italic_
     # Emoji and pictographs: one would force the whole SMS into 70-character Unicode.
     (re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\u25A0-\u25FF\u21BA\u21BB\uFE0F\u200D]+ ?"), ""),
 )
@@ -76,7 +86,9 @@ def clean_sms(text: str) -> str:
     One em dash or curly quote would otherwise force the whole SMS into the
     70-character Unicode encoding. Letters that need Unicode are left alone.
     """
-    text = text or ""
+    # The model can return very long text; only ~765 characters are ever sent, so
+    # bound the work done on the event loop before running the regexes.
+    text = (text or "")[:MAX_CLEAN_CHARS]
     for pattern, repl in _MARKDOWN:
         text = pattern.sub(repl, text)
     text = text.translate(_PLAIN)

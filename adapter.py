@@ -50,6 +50,22 @@ HELP_TEXT = ("Hermes Off-Grid: text any question to chat. Commands: NEW start a 
 BLOCKED_TEXT = "Command not available over SMS. Text HELP for options."
 
 
+def _args_allowed(name, args):
+    """Argument policy for allowlisted commands; a spoofable sender gets the narrowest form.
+
+    /resume takes only a list number (no titles: they reveal other sessions' titles,
+    no --all/--cross-room). /sessions, /new and /title take no arguments (a title
+    collision reports another session's id). /model may not use --global.
+    """
+    if name == "resume":
+        return not args or args.isascii() and args.isdecimal()
+    if name in ("sessions", "new", "title"):
+        return not args
+    if name == "model":
+        return "--global" not in args.lower()
+    return True
+
+
 def route_text(text, awaiting_confirm=False):
     """Classify inbound text as ("chat", text), ("command", "/name args") or ("reply", sms).
 
@@ -65,7 +81,7 @@ def route_text(text, awaiting_confirm=False):
         name = words[0][1:].lower().split("@", 1)[0] if words else ""
     elif words and words[0].lower() in _KEYWORDS and (
             len(words) == 1 or len(words) == 2 and (
-                words[0].lower() == "resume" and words[1].isdigit() or
+                words[0].lower() == "resume" and words[1].isascii() and words[1].isdecimal() or
                 words[0].lower() == "model" and _MODEL_ARG.match(words[1]))):
         name = words[0].lower()
     else:
@@ -73,10 +89,12 @@ def route_text(text, awaiting_confirm=False):
     name, args = _ALIASES.get(name, name), " ".join(words[1:])
     if name == "help":
         return "reply", HELP_TEXT
-    if name not in _COMMANDS or name == "model" and "--global" in args.lower():
+    if name not in _COMMANDS or not _args_allowed(name, args):
         return "reply", BLOCKED_TEXT
     if name == "model" and args and args.lower() != "reset":
-        args += " --session"  # a switch never persists to config.yaml (--session beats --global)
+        # Flag first, so a trailing "--provider" cannot swallow it as its value; a switch
+        # never persists to config.yaml (--session beats --global).
+        args = "--session " + args
     return "command", "/" + name + (" " + args if args else "")
 
 

@@ -25,11 +25,10 @@ HELP = ('reply', adapter.HELP_TEXT)
 class RouteTests(unittest.TestCase):
     def test_allowed_commands_get_control(self):
         for text, expected in [('/new', '/new'), ('/sessions', '/sessions'), ('/resume', '/resume'),
-                               ('/resume 2', '/resume 2'), ('/resume My Trip', '/resume My Trip'),
-                               ('/model', '/model'), ('/model gpt-5', '/model gpt-5 --session'),
+                               ('/resume 2', '/resume 2'),
+                               ('/model', '/model'), ('/model gpt-5', '/model --session gpt-5'),
                                ('/model reset', '/model reset'), ('/status', '/status'), ('/retry', '/retry'),
-                               ('/stop', '/stop'), ('/title Trip plan', '/title Trip plan'),
-                               ('/new weekend', '/new weekend')]:
+                               ('/stop', '/stop'), ('/title', '/title'), ('/reset', '/new')]:
             self.assertEqual(route(text), ('command', expected), text)
 
     def test_blocked_and_unknown_commands(self):
@@ -68,8 +67,8 @@ class RouteTests(unittest.TestCase):
         for text, expected in [('NEW', '/new'), ('new', '/new'), (' New ', '/new'), ('SESSIONS', '/sessions'),
                                ('sessions', '/sessions'), ('STATUS', '/status'), ('Resume', '/resume'),
                                ('RESUME 3', '/resume 3'), ('resume 12', '/resume 12'), ('MODEL', '/model'),
-                               ('model gpt-5.5', '/model gpt-5.5 --session'),
-                               ('MODEL openai/gpt-5', '/model openai/gpt-5 --session'),
+                               ('model gpt-5.5', '/model --session gpt-5.5'),
+                               ('MODEL openai/gpt-5', '/model --session openai/gpt-5'),
                                ('model reset', '/model reset')]:
             self.assertEqual(route(text), ('command', expected), text)
         self.assertEqual(route('HELP'), HELP)
@@ -183,3 +182,21 @@ class DispatchTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ArgumentPolicyTests(unittest.TestCase):
+    """Review follow-up: a spoofable sender gets only the narrowest argument forms."""
+
+    def test_narrow_arguments_are_refused(self):
+        for text in ['/resume My Trip', '/resume --all', '/resume 2 --cross-room', '/resume \u00b2',
+                     '/sessions all', '/sessions search tax', '/new Taxes', '/reset Taxes',
+                     '/title Taxes', '/model x --global', '/model x --GLOBAL --provider']:
+            self.assertEqual(adapter.route_text(text), ('reply', adapter.BLOCKED_TEXT), text)
+
+    def test_session_flag_cannot_be_swallowed_by_provider(self):
+        kind, command = adapter.route_text('/model gpt-5 --provider')
+        self.assertEqual(kind, 'command')
+        self.assertTrue(command.startswith('/model --session '), command)
+
+    def test_superscript_resume_keyword_is_not_a_command(self):
+        self.assertEqual(adapter.route_text('RESUME \u00b2'), ('chat', 'RESUME \u00b2'))

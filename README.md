@@ -74,17 +74,18 @@ SMS texts and USSD option 1 questions can run a safe subset of Hermes's own gate
 | --- | --- | --- |
 | `NEW` or `/new [name]` (`/reset`) | Hermes `/new` | Hermes asks to confirm. Reply `YES` (or `/approve`) to start a fresh chat, `NO` (or `/cancel`) to keep it. |
 | `SESSIONS` or `/sessions` | `/sessions` | Up to 10 named chats from this phone |
-| `RESUME <number>` or `/resume [name or number]` | `/resume` | Bare: numbered list. With a number or title: switches to it |
+| `RESUME <number>` or `/resume [number]` | `/resume` | Bare: numbered list. With a list number: switches to it. Titles and flags are refused |
 | `MODEL` or `/model` | `/model` | Current model plus the text list of available models (long lists are truncated) |
 | `MODEL <model id>` or `/model <args>` | `/model <args> --session` | Switches for this chat only; `--global` is refused |
 | `STATUS` or `/status` | `/status` | Session, model and token info |
-| `/title <name>`, `/retry`, `/stop` | same | Name the chat, resend the last message, stop the running answer |
+| `/title`, `/retry`, `/stop` | same | Show the chat title, resend the last message, stop the running answer |
 | `HELP` or `/help` | adapter text | A 214-character plain GSM-7 list of the keywords (Hermes's own `/help` lists commands SMS cannot run) |
 
 Rules:
 
 - Keywords are case-insensitive and only count as the **whole message**. `NEW`, `SESSIONS`, `STATUS`, `HELP` and `MODEL` must stand alone. `RESUME` takes exactly one number. `MODEL` takes exactly one model-like token (`reset`, or containing a digit or `/`, e.g. `gpt-5.5`, `openai/gpt-5`). So `new ideas for dinner?`, `resume writing tips` and `model airplanes` stay ordinary chat. To ask the model about a word that is a keyword, add any other word or punctuation (`NEW?`).
 - `YES`/`Y`/`OK`/`CONFIRM`/`/approve`/`/confirm` and `NO`/`N`/`CANCEL`/`/cancel` mean confirm or cancel only in the next message within 5 minutes after `NEW`; they are sent to Hermes as `/confirm` or `/cancel`, which can only answer the `/new` prompt, never a tool approval. Otherwise they are ordinary chat (`/approve` and `/cancel` are refused). `/always` is always refused because it writes Hermes config. If an operator turned `approvals.destructive_slash_confirm` off, `/new` runs at once and a `YES` sent right after gets Hermes's "unknown command" reply.
+- Arguments are narrowed for a spoofable sender: `/sessions`, `/new` and `/title` take no arguments, `/resume` takes only a list number, and `/model` always gets `--session` first and refuses `--global`. Titles are refused because Hermes reports title collisions and existence across sessions.
 - Refused: every other slash command, including `/yolo`, `/approve`, `/deny`, `/approvals`, `/config`, `/update`, `/tools`, `/pause`, `/sethome`, `/import`, `/export`, `/snapshot`, `/rollback`, `/bg`, `/goal`, `/loop`, `/heartbeat`, `/personality`, `/whoami`, `/history` (CLI-only in Hermes), plugin and skill commands, and unknown names. Matching mirrors Hermes's parser: leading whitespace, leading `@image:`/`@file:`/`@url:` lines, any case and `@bot` suffixes are classified; look-alike slashes (`／ ∕ ⁄ ⧸`) are treated as `/`. A `/` later in the text (`hello` then `/yolo` on the next line) is not a command to Hermes and stays chat.
 - Commands count against the same per-phone rate limit and duplicate checks as questions. Adapter replies (help, refused) go through the normal SMS path and allowlist.
 - Hermes has no plugin-level command allowlist. Operators can add a second layer with Hermes's own `user_allowed_commands` / `allow_admin_from` under `platforms.ussd` in `config.yaml`, but the adapter filter does not depend on it.
@@ -142,7 +143,7 @@ hermes plugins validate . --install-deps
 hermes --run-module unittest discover -s tests
 ```
 
-Last builder run: 72 tests passed offline, doctor passed, validate passed. Re-run after any change.
+Last builder run: 78 tests passed offline, doctor passed, validate passed. Re-run after any change.
 
 ---
 
@@ -251,7 +252,7 @@ These cover menu paths, SQLite state (last answer, admission, dedupe, rate limit
 hermes --run-module unittest discover -s tests
 ```
 
-Last builder run: 72 tests passed offline (including `tests/test_commands.py` for the command allowlist, keywords and parser bypasses), with a real local HTTP listener, queue draining, queue-full non-admission, adapter and standalone delivery, and missing-dependency registration. Provider delivery is faked. A separate runtime check also observed a provider-originated simulator SMS reaching Hermes and successful sandbox reply submission.
+Last builder run: 78 tests passed offline (including `tests/test_commands.py` for the command allowlist, keywords and parser bypasses), with a real local HTTP listener, queue draining, queue-full non-admission, adapter and standalone delivery, and missing-dependency registration. Provider delivery is faked. A separate runtime check also observed a provider-originated simulator SMS reaching Hermes and successful sandbox reply submission.
 
 Do not add `tests/__init__.py`. The repository root is a package whose `__init__` imports Hermes.
 
@@ -296,6 +297,7 @@ Pricing: this README makes no claim about cost. Check your provider's current pr
 ## Known gaps
 
 - **Sandbox only.** No live carrier or physical handset test has been run.
+- **Tool approvals.** An SMS user cannot answer a dangerous-command approval prompt; it times out and the action is blocked. Operators should keep approvals on (deny by default) for this platform and not enable YOLO mode.
 - **Command coverage.** MODEL switching, /retry, /stop, /title and commands through USSD have not been live-tested.
 - **Provider-specific requirements may apply.** Shortcode registration or on-demand link identifiers may need extra integration; these are not verified.
 - **Silent drops and queue loss.** Rate-limited and over-long SMS are dropped silently; a crash or restart can lose accepted questions. One worker handles all phones.

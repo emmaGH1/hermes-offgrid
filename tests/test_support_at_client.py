@@ -73,6 +73,21 @@ class EncodingTests(unittest.TestCase):
                          "Status\n(note) snake_case_name ok")
         self.assertEqual(sms_segments(clean_sms("\U0001F4CA " + "a" * 150)), 1)
 
+    def test_clean_keeps_code_like_text(self):
+        for text in ("2**10 = 1024", "__init__.py", "https://x.io/a__b_c", "snake_case and a_b_c", "2*3*4"):
+            self.assertEqual(clean_sms(text), text)
+        self.assertEqual(clean_sms("**bold** and __strong__ and _em_"), "bold and strong and em")
+
+    def test_clean_is_bounded_on_huge_input(self):
+        import time
+        start = time.monotonic()
+        self.assertLessEqual(len(clean_sms("[" * 40000)), 4000)
+        self.assertLess(time.monotonic() - start, 1.0)
+
+    def test_segments_do_not_split_escapes_or_surrogates(self):
+        self.assertEqual(sms_segments("a" * 152 + "{" + "a" * 152), 3)
+        self.assertEqual(sms_segments("a" * 66 + "\U0001F600" + "\u4f60" * 66), 3)
+
     def test_clean_keeps_real_unicode_letters_and_math(self):
         self.assertEqual(clean_sms("\u1ecd\u0301 d\u00e1ra 2 * 3"), "\u1ecd\u0301 d\u00e1ra 2 * 3")
 
@@ -137,7 +152,7 @@ class SendTests(unittest.TestCase):
 
     def test_markdown_only_text_makes_no_request(self):
         c, s = self.client()
-        self.assertFalse(run(c.send_sms(PHONE, "** **")).success)
+        self.assertFalse(run(c.send_sms(PHONE, "`` ``")).success)
         self.assertEqual(s.calls, [])
 
     def test_http_error_not_retried_and_sanitized(self):
