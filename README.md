@@ -7,7 +7,7 @@ A Hermes platform plugin for people with a basic phone and no data. Text a quest
 - **Main channel: SMS.** The person texts a question. The provider posts the incoming message to this plugin's `/sms` route. The reply comes back as SMS.
 - **Fallback: USSD.** The person dials a USSD code. The provider posts the session to `/ussd`. The short menu is answered on the call, and the reply comes back as SMS.
 - **Both channels share one Hermes conversation per phone number.** There is no separate session per channel.
-- **Scheduled results** can also be texted to one configured home number (`USSD_HOME_PHONE`).
+- **Scheduled results** can also be texted to one configured home number (`OFFGRID_HOME_PHONE`).
 
 What the person needs: a phone with cellular SMS service (and USSD for the fallback). No app install and no phone data. The server running Hermes needs internet access and a public HTTPS address that the provider can reach.
 
@@ -36,15 +36,15 @@ The sandbox simulator is the exception: it runs in a browser on your own compute
 ## How it works
 
 ```
-SMS    phone --text--> provider --POST /sms?token=...--> hermes-ussd listener
-USSD   phone --dial--> provider --POST /ussd?token=...--> hermes-ussd listener
+SMS    phone --text--> provider --POST /sms?token=...--> hermes-offgrid listener
+USSD   phone --dial--> provider --POST /ussd?token=...--> hermes-offgrid listener
                                                               |
                   SMS: HTTP 200 empty, no reply on the request
                   USSD: CON/END menu text, HTTP 200 immediately
                                                               |
                   accepted question --> in-memory queue --> one Hermes turn (handle_message)
                                                               |
-phone <--SMS-- provider <--send()-- hermes-ussd adapter <-- reply
+phone <--SMS-- provider <--send()-- hermes-offgrid adapter <-- reply
 ```
 
 1. **SMS in.** The provider POSTs `id`, `from`, `to`, `text` to `/sms`. The plugin checks the callback token, validates the fields and the sender number, and checks the allowlist. Only then does it touch state.
@@ -103,24 +103,24 @@ You need:
 Steps:
 
 1. **Install Hermes** and confirm the model provider answers. Provider settings belong to the Hermes host (for example `<model-provider-url>`, `<model-name>` and the provider key in `MODEL_API_KEY`). The plugin never reads `MODEL_API_KEY`.
-2. **Place this plugin** where Hermes loads plugins and enable it as `hermes-ussd`. The display label is **Off-Grid**.
+2. **Place this plugin** where Hermes loads plugins and enable it as `hermes-offgrid`. The display label is **Off-Grid**.
 3. **Install the dependency** declared in the manifest (`aiohttp>=3.9,<4`):
    ```bash
    hermes plugins validate . --install-deps
    ```
 4. **Set the environment** in the Hermes profile (see the table below). Never put values in this repository or a commit.
-5. **Start the gateway.** The listener binds `USSD_HOST:USSD_PORT` (default `127.0.0.1:8080`) and exposes two routes: `POST /ussd` and `POST /sms`.
+5. **Start the gateway.** The listener binds `OFFGRID_HOST:OFFGRID_PORT` (default `127.0.0.1:8080`) and exposes two routes: `POST /ussd` and `POST /sms`.
 6. **Expose the port over HTTPS.** Then configure the provider:
    - **SMS shortcode:** set up an SMS shortcode or sender in the provider's dashboard. Set `AT_SENDER_ID` to the approved value (see below).
    - **Incoming Messages callback:** set the callback for the shortcode to
      ```
-     https://<your-public-host>/sms?token=<USSD_CALLBACK_SECRET>
+     https://<your-public-host>/sms?token=<OFFGRID_CALLBACK_SECRET>
      ```
    - **USSD channel (fallback):** set the channel callback to
      ```
-     https://<your-public-host>/ussd?token=<USSD_CALLBACK_SECRET>
+     https://<your-public-host>/ussd?token=<OFFGRID_CALLBACK_SECRET>
      ```
-   Use the same token value in both URLs, and the exact value of `USSD_CALLBACK_SECRET`.
+   Use the same token value in both URLs, and the exact value of `OFFGRID_CALLBACK_SECRET`.
 7. **Check by texting** the shortcode from an allowlisted number, then follow the [demo](#demo).
 
 For an SMS conversation, configure Hermes to queue follow-ups while a reply is running:
@@ -149,24 +149,24 @@ Last builder run: 78 tests passed offline, doctor passed, validate passed. Re-ru
 
 ## Environment variables
 
-Read through Hermes scoped secret lookup, with a fallback to platform `extra` for most names. `USSD_ALLOWED_USERS` must be set through the environment so the gateway and plugin agree.
+Read through Hermes scoped secret lookup, with a fallback to platform `extra` for most names. `OFFGRID_ALLOWED_USERS` must be set through the environment so the gateway and plugin agree.
 
 | Name | Required | Secret | Default | Read by | Purpose |
 | --- | --- | --- | --- | --- | --- |
 | `AT_API_KEY` | yes | yes | none | adapter, standalone sender | Provider API key. Sent in the `apiKey` header only. |
 | `AT_USERNAME` | yes | no | none | adapter, standalone sender | Provider username. Use `sandbox` for the sandbox. |
-| `USSD_CALLBACK_SECRET` | yes | yes | none | adapter | Token that must match the `token` query parameter on `/ussd` and `/sms`. At least 24 characters. Compared in constant time. |
-| `USSD_ALLOWED_USERS` | yes | no | none | adapter, sender | Comma-separated E.164 numbers allowed to use SMS and USSD and to receive replies. Must be non-empty. Treat as private. |
+| `OFFGRID_CALLBACK_SECRET` | yes | yes | none | adapter | Token that must match the `token` query parameter on `/ussd` and `/sms`. At least 24 characters. Compared in constant time. |
+| `OFFGRID_ALLOWED_USERS` | yes | no | none | adapter, sender | Comma-separated E.164 numbers allowed to use SMS and USSD and to receive replies. Must be non-empty. Treat as private. |
 | `OFFGRID_RATE_LIMIT` | no | no | `3` | adapter | Accepted questions per phone per 60 seconds across SMS and USSD, clamped to 1–30. Current demo uses 10. |
 | `AT_SENDER_ID` | no | no | provider default | adapter, sender | Approved outbound sender. Prefer a numeric shortcode that can receive replies. |
 | `AT_SANDBOX` | no | no | `true` | adapter, sender | Only `false`, `0`, or `no` selects the live URL. Anything else selects sandbox. |
-| `USSD_HOME_PHONE` | no | no | none | Hermes cron delivery (`cron_deliver_env_var`) | E.164 number that receives scheduled-task results by SMS. Must also be in `USSD_ALLOWED_USERS`. |
-| `USSD_HOST` | no | no | `127.0.0.1` | adapter | Listener address. Keep it on loopback and let the HTTPS ingress reach it. |
-| `USSD_PORT` | no | no | `8080` | adapter | Listener port. |
+| `OFFGRID_HOME_PHONE` | no | no | none | Hermes cron delivery (`cron_deliver_env_var`) | E.164 number that receives scheduled-task results by SMS. Must also be in `OFFGRID_ALLOWED_USERS`. |
+| `OFFGRID_HOST` | no | no | `127.0.0.1` | adapter | Listener address. Keep it on loopback and let the HTTPS ingress reach it. |
+| `OFFGRID_PORT` | no | no | `8080` | adapter | Listener port. |
 
 Not a plugin variable: `MODEL_API_KEY` (Hermes provider key, a prerequisite).
 
-Platform ID `ussd`, plugin name `hermes-ussd` and these variable names are kept for compatibility, even though the main channel is now SMS.
+The platform ID is `offgrid` and the plugin name is `hermes-offgrid`. Names are chosen not to clash with the existing `ussd-platform` catalog plugin, which registers `ussd` and `USSD_*` variables, so both can be installed side by side.
 
 ---
 
@@ -220,7 +220,7 @@ For conversational SMS, set `OFFGRID_RATE_LIMIT=10` in the Hermes environment an
 
 **Silent drops on the SMS path.** `/sms` always answers HTTP 200 with an empty body, so the provider does not retry. That means these cases send **no** reply and give the person **no** message:
 
-- invalid or missing fields, or a number not in `USSD_ALLOWED_USERS`
+- invalid or missing fields, or a number not in `OFFGRID_ALLOWED_USERS`
 - wrong or missing token
 - queue full (busy)
 - rate limited (over the configured per-minute budget)
@@ -260,8 +260,8 @@ Do not add `tests/__init__.py`. The repository root is a package whose `__init__
 
 ## Security
 
-- **Callback token.** Every request to `/ussd` and `/sms` needs `token` equal to `USSD_CALLBACK_SECRET`. Failures get a generic response with no side effects. The comparison is constant time.
-- **Allowlist.** Numbers must be valid E.164 and in `USSD_ALLOWED_USERS` before any state is read. Anything else gets the same generic response, so the endpoints do not reveal which numbers exist. Hermes's own authorization still applies because messages go through `handle_message`. Trusted inbound is not enabled. Pairing and automatic enrollment are not used.
+- **Callback token.** Every request to `/ussd` and `/sms` needs `token` equal to `OFFGRID_CALLBACK_SECRET`. Failures get a generic response with no side effects. The comparison is constant time.
+- **Allowlist.** Numbers must be valid E.164 and in `OFFGRID_ALLOWED_USERS` before any state is read. Anything else gets the same generic response, so the endpoints do not reveal which numbers exist. Hermes's own authorization still applies because messages go through `handle_message`. Trusted inbound is not enabled. Pairing and automatic enrollment are not used.
 - **Gateway control only for allowlisted commands.** Plain chat has gateway control disabled. Only the commands in [Commands over SMS](#commands-over-sms) reach Hermes with control; anything that Hermes would parse as another command is answered with a fixed SMS and never dispatched. None of the allowed commands change config, approvals, tools or other people's sessions (Hermes limits `/sessions` and `/resume` to this phone's own chats unless an explicit admin is configured). The platform does not accept `update` commands.
 - **Limits of the design.**
   - The callback token authenticates the caller of the callback, not the handset holding the number. The provider supplies the sender number, and the plugin trusts it.

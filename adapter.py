@@ -104,7 +104,7 @@ def _setting(config, name, default=""):
 
 
 def _allowed(config):
-    return {p.strip() for p in str(get_scoped_secret("USSD_ALLOWED_USERS") or "").split(",") if _PHONE.fullmatch(p.strip())}
+    return {p.strip() for p in str(get_scoped_secret("OFFGRID_ALLOWED_USERS") or "").split(",") if _PHONE.fullmatch(p.strip())}
 
 
 def _question_limit(config):
@@ -116,11 +116,11 @@ def _question_limit(config):
 
 def validate_config(config):
     return bool(_setting(config, "AT_API_KEY") and _setting(config, "AT_USERNAME") and
-                len(str(_setting(config, "USSD_CALLBACK_SECRET"))) >= 24 and _allowed(config))
+                len(str(_setting(config, "OFFGRID_CALLBACK_SECRET"))) >= 24 and _allowed(config))
 
 
 def _env_enablement():
-    names = ("AT_API_KEY", "AT_USERNAME", "USSD_CALLBACK_SECRET", "USSD_ALLOWED_USERS")
+    names = ("AT_API_KEY", "AT_USERNAME", "OFFGRID_CALLBACK_SECRET", "OFFGRID_ALLOWED_USERS")
     if not all(get_scoped_secret(n) for n in names):
         return None
     return {n.lower(): get_scoped_secret(n) for n in names}
@@ -151,7 +151,7 @@ class USSDAdapter(BasePlatformAdapter):
     splits_long_messages = True
 
     def __init__(self, config, **kwargs):
-        super().__init__(config=config, platform=Platform("ussd"))
+        super().__init__(config=config, platform=Platform("offgrid"))
         self._runner = self._session = self._store = self._worker = None
         self._queue = asyncio.Queue(maxsize=100)
         self._confirm_until = {}
@@ -170,15 +170,15 @@ class USSDAdapter(BasePlatformAdapter):
             logger.warning("USSD configuration invalid")
             return False
         try:
-            self._store = StateStore(plugin_db("hermes-ussd"))
+            self._store = StateStore(plugin_db("hermes-offgrid"))
             self._session = aiohttp.ClientSession()
             app = web.Application(client_max_size=12288)
             app.router.add_post("/ussd", self.callback)
             app.router.add_post("/sms", self.sms_callback)
             self._runner = web.AppRunner(app, access_log=None)
             await self._runner.setup()
-            site = web.TCPSite(self._runner, _setting(self.config, "USSD_HOST", "127.0.0.1"),
-                               int(_setting(self.config, "USSD_PORT", "8080")))
+            site = web.TCPSite(self._runner, _setting(self.config, "OFFGRID_HOST", "127.0.0.1"),
+                               int(_setting(self.config, "OFFGRID_PORT", "8080")))
             await site.start()
             self._worker = asyncio.create_task(self._dispatch())
             self._mark_connected()
@@ -214,7 +214,7 @@ class USSDAdapter(BasePlatformAdapter):
         def response(text):
             return web.Response(text=text, content_type="text/plain")
         token = request.query.get("token", "")
-        secret = str(_setting(self.config, "USSD_CALLBACK_SECRET"))
+        secret = str(_setting(self.config, "OFFGRID_CALLBACK_SECRET"))
         if not secret or not hmac.compare_digest(token.encode(), secret.encode()):
             return response(_REJECT)
         try:
@@ -244,7 +244,7 @@ class USSDAdapter(BasePlatformAdapter):
     async def sms_callback(self, request):
         # Always acknowledge to avoid provider retry storms and paid duplicate replies.
         response = web.Response(text="", content_type="text/plain")
-        secret = str(_setting(self.config, "USSD_CALLBACK_SECRET"))
+        secret = str(_setting(self.config, "OFFGRID_CALLBACK_SECRET"))
         token = request.query.get("token", "")
         if not secret or not hmac.compare_digest(token.encode(), secret.encode()):
             now = time.monotonic()
@@ -318,7 +318,7 @@ async def standalone_send(pconfig, chat_id, message, *, thread_id=None, media_fi
         return {"success": False, "error": "USSD configuration unavailable"}
     store = None
     try:
-        store = StateStore(plugin_db("hermes-ussd"))
+        store = StateStore(plugin_db("hermes-offgrid"))
         async with aiohttp.ClientSession() as session:
             result = await _deliver(pconfig, _client(session, pconfig), store, chat_id, message)
         return {"success": result.success, **({"message_id": result.message_id} if result.success else {"error": result.error})}
@@ -331,14 +331,14 @@ async def standalone_send(pconfig, chat_id, message, *, thread_id=None, media_fi
 
 
 def register(ctx):
-    ctx.register_platform(name="ussd", label="Off-Grid", dashboard_description="SMS conversations with USSD fallback",
+    ctx.register_platform(name="offgrid", label="Off-Grid", dashboard_description="SMS conversations with USSD fallback",
                           adapter_factory=USSDAdapter, check_fn=lambda: importlib.util.find_spec("aiohttp") is not None,
                           install_hint="Install the declared aiohttp dependency.",
                           validate_config=validate_config, is_connected=validate_config,
-                          required_env=["AT_API_KEY", "AT_USERNAME", "USSD_CALLBACK_SECRET", "USSD_ALLOWED_USERS"],
-                          env_enablement_fn=_env_enablement, allowed_users_env="USSD_ALLOWED_USERS",
-                          cron_deliver_env_var="USSD_HOME_PHONE", standalone_sender_fn=standalone_send,
+                          required_env=["AT_API_KEY", "AT_USERNAME", "OFFGRID_CALLBACK_SECRET", "OFFGRID_ALLOWED_USERS"],
+                          env_enablement_fn=_env_enablement, allowed_users_env="OFFGRID_ALLOWED_USERS",
+                          cron_deliver_env_var="OFFGRID_HOME_PHONE", standalone_sender_fn=standalone_send,
                           max_message_length=0, display_tier="minimal", pii_safe=True,
                           display_overrides={"busy_steer_ack_enabled": False},
                           allow_update_command=False, allowlist_suppresses_pairing=True,
-                          platform_hint="You are chatting through Hermes Off-Grid over SMS, with an optional USSD fallback. The platform identifier ussd is retained for compatibility. Do not guess the model name. Reply in plain text with no Markdown, emoji or special symbols. Keep replies short: aim for under 450 characters; anything past about 750 is cut off.")
+                          platform_hint="You are chatting through Hermes Off-Grid over SMS, with an optional USSD fallback. Do not guess the model name. Reply in plain text with no Markdown, emoji or special symbols. Keep replies short: aim for under 450 characters; anything past about 750 is cut off.")

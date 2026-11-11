@@ -105,8 +105,8 @@ class RouteTests(unittest.TestCase):
 class DispatchTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         from gateway.config import PlatformConfig
-        values = {'AT_API_KEY': 'dummy', 'AT_USERNAME': 'sandbox', 'USSD_CALLBACK_SECRET': 's' * 32,
-                  'USSD_ALLOWED_USERS': '+12345678901', 'USSD_PORT': '0'}
+        values = {'AT_API_KEY': 'dummy', 'AT_USERNAME': 'sandbox', 'OFFGRID_CALLBACK_SECRET': 's' * 32,
+                  'OFFGRID_ALLOWED_USERS': '+12345678901', 'OFFGRID_PORT': '0'}
         for target in (patch.object(adapter, 'get_scoped_secret', side_effect=values.get),
                        patch.object(adapter, 'plugin_db', side_effect=lambda _: sqlite3.connect(':memory:'))):
             target.start()

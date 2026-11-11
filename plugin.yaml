@@ -1,4 +1,4 @@
-name: hermes-ussd
+name: hermes-offgrid
 label: Off-Grid
 kind: platform
 version: 1.0.0
@@ -13,10 +13,10 @@ requires_env:
     password: true
   - name: AT_USERNAME
     description: Africa's Talking username (sandbox for sandbox)
-  - name: USSD_CALLBACK_SECRET
+  - name: OFFGRID_CALLBACK_SECRET
     description: Secret query token for the callback URL
     password: true
-  - name: USSD_ALLOWED_USERS
+  - name: OFFGRID_ALLOWED_USERS
     description: Comma-separated E.164 phone numbers allowed to use USSD and receive SMS
     password: false
 optional_env:
@@ -26,9 +26,9 @@ optional_env:
     description: Approved Africa's Talking sender ID or shortcode for SMS replies
   - name: AT_SANDBOX
     description: Use sandbox endpoints (default true)
-  - name: USSD_HOME_PHONE
+  - name: OFFGRID_HOME_PHONE
     description: Allowlisted E.164 number for scheduled delivery
-  - name: USSD_HOST
+  - name: OFFGRID_HOST
     description: Listener address (default 127.0.0.1)
-  - name: USSD_PORT
+  - name: OFFGRID_PORT
     description: Listener port (default 8080)

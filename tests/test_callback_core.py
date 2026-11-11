@@ -33,7 +33,7 @@ class Store:
 class CallbackTests(unittest.IsolatedAsyncioTestCase):
  async def test_callback_auth_admission_and_retries(self):
      obj = object.__new__(adapter.USSDAdapter)
-     obj.config = SimpleNamespace(extra={'ussd_callback_secret': 'secret', 'ussd_allowed_users': '+12345678901'})
+     obj.config = SimpleNamespace(extra={'offgrid_callback_secret': 'secret', 'offgrid_allowed_users': '+12345678901'})
      obj._store = Store()
      obj._queue = asyncio.Queue(maxsize=100)
      app = web.Application(client_max_size=4096)
@@ -43,7 +43,7 @@ class CallbackTests(unittest.IsolatedAsyncioTestCase):
              resp = await client.post('/ussd', params={'token': token}, data={'sessionId': session, 'phoneNumber': phone, 'text': text})
              assert resp.status == 200
              return await resp.text()
-         with patch.object(adapter, 'get_scoped_secret', side_effect=lambda n: '+12345678901' if n == 'USSD_ALLOWED_USERS' else None):
+         with patch.object(adapter, 'get_scoped_secret', side_effect=lambda n: '+12345678901' if n == 'OFFGRID_ALLOWED_USERS' else None):
              assert (await post()).startswith('CON hermes')
              assert (await post('1')).startswith('CON ')
              assert await post('2') == 'END last reply'
@@ -91,8 +91,8 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         import sqlite3
         from gateway.config import PlatformConfig
         self.values = {'AT_API_KEY': 'dummy', 'AT_USERNAME': 'sandbox',
-                       'USSD_CALLBACK_SECRET': 's' * 32,
-                       'USSD_ALLOWED_USERS': '+12345678901', 'USSD_PORT': '0'}
+                       'OFFGRID_CALLBACK_SECRET': 's' * 32,
+                       'OFFGRID_ALLOWED_USERS': '+12345678901', 'OFFGRID_PORT': '0'}
         self.secrets = patch.object(adapter, 'get_scoped_secret', side_effect=self.values.get)
         self.secrets.start()
         self.addCleanup(self.secrets.stop)
@@ -130,9 +130,9 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.obj._store)
 
     async def test_invalid_config_and_bind_failure_cleanup(self):
-        self.values['USSD_CALLBACK_SECRET'] = 'short'
+        self.values['OFFGRID_CALLBACK_SECRET'] = 'short'
         self.assertFalse(await self.obj.connect())
-        self.values['USSD_CALLBACK_SECRET'] = 's' * 32
+        self.values['OFFGRID_CALLBACK_SECRET'] = 's' * 32
         from unittest.mock import AsyncMock
         with patch.object(adapter.web.TCPSite, 'start', new=AsyncMock(side_effect=OSError('private detail'))):
             with self.assertLogs(adapter.logger, level='WARNING') as logs:
@@ -192,7 +192,7 @@ class SMSCallbackTests(unittest.IsolatedAsyncioTestCase):
  async def test_auth_dedupe_rate_bounds_and_busy(self):
      import sqlite3
      obj = object.__new__(adapter.USSDAdapter)
-     obj.config = SimpleNamespace(extra={'ussd_callback_secret': 'secret'})
+     obj.config = SimpleNamespace(extra={'offgrid_callback_secret': 'secret'})
      obj._store = adapter.StateStore(sqlite3.connect(':memory:'))
      obj._queue = asyncio.Queue(maxsize=4)
      app = web.Application(client_max_size=4096)
@@ -205,7 +205,7 @@ class SMSCallbackTests(unittest.IsolatedAsyncioTestCase):
              response = await client.post('/sms?token=secret', data=data)
              self.assertEqual(response.status, 200)
              self.assertEqual(await response.text(), '')
-         with patch.object(adapter, 'get_scoped_secret', side_effect=lambda n: '+12345678901' if n == 'USSD_ALLOWED_USERS' else None):
+         with patch.object(adapter, 'get_scoped_secret', side_effect=lambda n: '+12345678901' if n == 'OFFGRID_ALLOWED_USERS' else None):
              await sms(**{'from':'+12345678902'})
              await sms(text='x'*501)
              await client.post('/sms?token=wrong', data={'id':'bad','from':'+12345678901','to':'1','text':'x'})
@@ -259,13 +259,13 @@ class SMSRateLimitTests(unittest.IsolatedAsyncioTestCase):
     async def test_configured_ten_message_budget_and_duplicate(self):
         import sqlite3
         obj = object.__new__(adapter.USSDAdapter)
-        obj.config = SimpleNamespace(extra={'ussd_callback_secret': 's' * 32, 'offgrid_rate_limit': '10'})
+        obj.config = SimpleNamespace(extra={'offgrid_callback_secret': 's' * 32, 'offgrid_rate_limit': '10'})
         obj._store = adapter.StateStore(sqlite3.connect(':memory:'))
         self.addCleanup(obj._store.close)
         obj._queue = asyncio.Queue(maxsize=100)
         app = web.Application()
         app.router.add_post('/sms', obj.sms_callback)
-        with patch.object(adapter, 'get_scoped_secret', side_effect=lambda n: '+12345678901' if n == 'USSD_ALLOWED_USERS' else None):
+        with patch.object(adapter, 'get_scoped_secret', side_effect=lambda n: '+12345678901' if n == 'OFFGRID_ALLOWED_USERS' else None):
             async with TestClient(TestServer(app)) as client:
                 for i in [0, 0, *range(1, 11)]:
                     response = await client.post('/sms', params={'token': 's' * 32},
