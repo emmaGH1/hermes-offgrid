@@ -14,7 +14,7 @@ class MenuTests(unittest.TestCase):
     def test_root_for_empty_and_none(self):
         for text in ("", None, "   "):
             r = handle_ussd(PHONE, text, None)
-            self.assertEqual(r.response_text, "CON hermes\n1. ask hermes\n2. last answer")
+            self.assertEqual(r.response_text, "CON offgrid\n1. ask hermes\n2. last answer")
             self.assertIsNone(r.question)
 
     def test_ask_prompt(self):

@@ -11,7 +11,7 @@ _NEXT_SUFFIX = "\n1. next page"
 # Reserve room for the "CON " prefix and the next-page instruction.
 _PAGE_CHARS = MAX_SCREEN_CHARS - len("CON ") - len(_NEXT_SUFFIX)
 
-ROOT_SCREEN = "CON hermes\n1. ask hermes\n2. last answer"
+ROOT_SCREEN = "CON offgrid\n1. ask hermes\n2. last answer"
 ASK_SCREEN = "CON type your question"
 QUEUED_SCREEN = "END got it. answer coming by sms."
 EMPTY_QUESTION_SCREEN = "END empty question. dial again to retry."

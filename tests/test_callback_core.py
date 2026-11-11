@@ -44,7 +44,7 @@ class CallbackTests(unittest.IsolatedAsyncioTestCase):
              assert resp.status == 200
              return await resp.text()
          with patch.object(adapter, 'get_scoped_secret', side_effect=lambda n: '+12345678901' if n == 'OFFGRID_ALLOWED_USERS' else None):
-             assert (await post()).startswith('CON hermes')
+             assert (await post()).startswith('CON offgrid')
              assert (await post('1')).startswith('CON ')
              assert await post('2') == 'END last reply'
              assert (await post('1*hello', token='bad')).startswith('END request')
