@@ -1,5 +1,5 @@
-name: hermes-offgrid
-label: Off-Grid
+name: offgrid
+label: Offgrid
 kind: platform
 version: 1.0.0
 requires_hermes: ">=0.23.1"

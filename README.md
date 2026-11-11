@@ -1,6 +1,6 @@
 <img src="assets/icon.svg" width="64" height="64" alt="">
 
-# Hermes Off-Grid
+# Offgrid
 
 A Hermes platform plugin for people with a basic phone and no data. Text a question to a shortcode, or dial a USSD code as a fallback. The reply comes back by SMS. Text commands can manage sessions, switch the model and show status.
 
@@ -36,15 +36,15 @@ The sandbox simulator is the exception: it runs in a browser on your own compute
 ## How it works
 
 ```
-SMS    phone --text--> provider --POST /sms?token=...--> hermes-offgrid listener
-USSD   phone --dial--> provider --POST /ussd?token=...--> hermes-offgrid listener
+SMS    phone --text--> provider --POST /sms?token=...--> offgrid listener
+USSD   phone --dial--> provider --POST /ussd?token=...--> offgrid listener
                                                               |
                   SMS: HTTP 200 empty, no reply on the request
                   USSD: CON/END menu text, HTTP 200 immediately
                                                               |
                   accepted question --> in-memory queue --> one Hermes turn (handle_message)
                                                               |
-phone <--SMS-- provider <--send()-- hermes-offgrid adapter <-- reply
+phone <--SMS-- provider <--send()-- offgrid adapter <-- reply
 ```
 
 1. **SMS in.** The provider POSTs `id`, `from`, `to`, `text` to `/sms`. The plugin checks the callback token, validates the fields and the sender number, and checks the allowlist. Only then does it touch state.
@@ -103,7 +103,7 @@ You need:
 Steps:
 
 1. **Install Hermes** and confirm the model provider answers. Provider settings belong to the Hermes host (for example `<model-provider-url>`, `<model-name>` and the provider key in `MODEL_API_KEY`). The plugin never reads `MODEL_API_KEY`.
-2. **Place this plugin** where Hermes loads plugins and enable it as `hermes-offgrid`. The display label is **Off-Grid**.
+2. **Place this plugin** where Hermes loads plugins and enable it as `offgrid`. The display label is **Offgrid**.
 3. **Install the dependency** declared in the manifest (`aiohttp>=3.9,<4`):
    ```bash
    hermes plugins validate . --install-deps
@@ -166,7 +166,7 @@ Read through Hermes scoped secret lookup, with a fallback to platform `extra` fo
 
 Not a plugin variable: `MODEL_API_KEY` (Hermes provider key, a prerequisite).
 
-The platform ID is `offgrid` and the plugin name is `hermes-offgrid`. Names are chosen not to clash with the existing `ussd-platform` catalog plugin, which registers `ussd` and `USSD_*` variables, so both can be installed side by side.
+The platform ID is `offgrid` and the plugin name is `offgrid`. Names are chosen not to clash with the existing `ussd-platform` catalog plugin, which registers `ussd` and `USSD_*` variables, so both can be installed side by side.
 
 ---
 

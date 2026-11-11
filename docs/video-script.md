@@ -2,7 +2,7 @@
 
 Record the Africa's Talking sandbox simulator. Hide phone numbers, codes, callback URLs and credentials. This is a sandbox demo, not a live carrier or handset test.
 
-- **0:00–0:15:** Text a question to the shortcode and show the single SMS reply. “Hermes Off-Grid lets you chat with your agent by text, without phone data.”
+- **0:00–0:15:** Text a question to the shortcode and show the single SMS reply. “Offgrid lets you chat with your agent by text, without phone data.”
 - **0:15–0:25:** Send `HELP` and show the available commands.
 - **0:25–0:40:** Send `NEW`, then `YES` to confirm. Send `SESSIONS`, then `RESUME <number>` to restore an older chat.
 - **0:40–0:50:** Send `MODEL` and show the model list. Model switching has not been live-tested.

@@ -44,7 +44,7 @@ _CONFIRM_WORDS = {"yes": "/confirm", "y": "/confirm", "ok": "/confirm", "confirm
                   "approve": "/confirm", "/confirm": "/confirm", "/approve": "/confirm",
                   "no": "/cancel", "n": "/cancel", "cancel": "/cancel", "/cancel": "/cancel"}
 _CONFIRM_SECONDS = 300
-HELP_TEXT = ("Hermes Off-Grid: text any question to chat. Commands: NEW start a new chat (then YES "
+HELP_TEXT = ("Offgrid: text any question to chat. Commands: NEW start a new chat (then YES "
              "to confirm), SESSIONS list chats, RESUME 2 reopen chat 2, MODEL show models, MODEL name "
              "switch, STATUS chat info, HELP this list.")
 BLOCKED_TEXT = "Command not available over SMS. Text HELP for options."
@@ -158,7 +158,7 @@ class USSDAdapter(BasePlatformAdapter):
 
     @property
     def name(self):
-        return "Off-Grid"
+        return "Offgrid"
 
     async def connect(self, *, is_reconnect=False):
         if self._runner:
@@ -170,7 +170,7 @@ class USSDAdapter(BasePlatformAdapter):
             logger.warning("USSD configuration invalid")
             return False
         try:
-            self._store = StateStore(plugin_db("hermes-offgrid"))
+            self._store = StateStore(plugin_db("offgrid"))
             self._session = aiohttp.ClientSession()
             app = web.Application(client_max_size=12288)
             app.router.add_post("/ussd", self.callback)
@@ -318,7 +318,7 @@ async def standalone_send(pconfig, chat_id, message, *, thread_id=None, media_fi
         return {"success": False, "error": "USSD configuration unavailable"}
     store = None
     try:
-        store = StateStore(plugin_db("hermes-offgrid"))
+        store = StateStore(plugin_db("offgrid"))
         async with aiohttp.ClientSession() as session:
             result = await _deliver(pconfig, _client(session, pconfig), store, chat_id, message)
         return {"success": result.success, **({"message_id": result.message_id} if result.success else {"error": result.error})}
@@ -331,7 +331,7 @@ async def standalone_send(pconfig, chat_id, message, *, thread_id=None, media_fi
 
 
 def register(ctx):
-    ctx.register_platform(name="offgrid", label="Off-Grid", dashboard_description="SMS conversations with USSD fallback",
+    ctx.register_platform(name="offgrid", label="Offgrid", dashboard_description="SMS conversations with USSD fallback",
                           adapter_factory=USSDAdapter, check_fn=lambda: importlib.util.find_spec("aiohttp") is not None,
                           install_hint="Install the declared aiohttp dependency.",
                           validate_config=validate_config, is_connected=validate_config,
@@ -341,4 +341,4 @@ def register(ctx):
                           max_message_length=0, display_tier="minimal", pii_safe=True,
                           display_overrides={"busy_steer_ack_enabled": False},
                           allow_update_command=False, allowlist_suppresses_pairing=True,
-                          platform_hint="You are chatting through Hermes Off-Grid over SMS, with an optional USSD fallback. Do not guess the model name. Reply in plain text with no Markdown, emoji or special symbols. Keep replies short: aim for under 450 characters; anything past about 750 is cut off.")
+                          platform_hint="You are chatting through Offgrid over SMS, with an optional USSD fallback. Do not guess the model name. Reply in plain text with no Markdown, emoji or special symbols. Keep replies short: aim for under 450 characters; anything past about 750 is cut off.")
